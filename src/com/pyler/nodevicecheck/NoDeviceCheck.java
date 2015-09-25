@@ -1,5 +1,7 @@
 package com.pyler.nodevicecheck;
 
+import java.io.File;
+
 import org.json.JSONObject;
 
 import de.robv.android.xposed.IXposedHookLoadPackage;
@@ -17,11 +19,13 @@ public class NoDeviceCheck implements IXposedHookLoadPackage {
                         protected void beforeHookedMethod(MethodHookParam param)
                                 throws Throwable {
                             File file = (File) param.thisObject;
+                            // Disable check for enforced SELinux state
                             if (new File("/sys/fs/selinux/enforce").equals(file)) {
                                 param.setResult(true);
                                 return;
                             }
-
+                            
+                            // Disable check for SU binary files
                             if (new File("/system/bin/su").equals(file) || new File("/system/xbin/su").equals(file)) {
                                 param.setResult(false);
                                 return;
@@ -36,6 +40,7 @@ public class NoDeviceCheck implements IXposedHookLoadPackage {
 					protected void beforeHookedMethod(MethodHookParam param)
 							throws Throwable {
 						String name = (String) param.args[0];
+						// Modify server response to pass CTS check
 						if ("ctsProfileMatch".equals(name)
 								|| "isValidSignature".equals(name)) {
 							param.setResult(true);
