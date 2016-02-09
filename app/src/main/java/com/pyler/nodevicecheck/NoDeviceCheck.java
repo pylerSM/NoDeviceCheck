@@ -17,7 +17,7 @@ public class NoDeviceCheck implements IXposedHookLoadPackage {
     public static final String CLASS_DROIDGUARD = "com.google.ccc.abulse.droidguard.DroidGuard";
     @Override
     public void handleLoadPackage(final LoadPackageParam lpparam) throws Throwable {
-        XposedBridge.log("NoDeviceCheck: We got that fucking droidguard apk");
+        XposedBridge.log("NoDeviceCheck: We got droidguard apk");
         if (lpparam.packageName.equals("com.google.ccc.abuse.droidguard")) {
 
             XposedHelpers.findAndHookMethod(CLASS_DROIDGUARD, lpparam.classLoader, "close",
@@ -105,7 +105,7 @@ public class NoDeviceCheck implements IXposedHookLoadPackage {
                         }
                     });
         }
-        if (("android".equals(lpparam.packageName)) || (lpparam.packageName.equals("com.google.android.gms")) || (lpparam.packageName.equals("com.google.android.apps.walletnfcrel")))  {
+        if (("android".equals(lpparam.packageName)) || (lpparam.packageName.equals("com.google.ccc.abuse.droidguard")) || (lpparam.packageName.equals("com.google.android.gms")) || (lpparam.packageName.equals("com.google.android.apps.walletnfcrel")))  {
             XposedHelpers.findAndHookMethod(File.class, "exists",
                     new XC_MethodHook() {
                         @Override
@@ -136,7 +136,26 @@ public class NoDeviceCheck implements IXposedHookLoadPackage {
                     protected void afterHookedMethod(MethodHookParam param)
                             throws Throwable {
                             File file = (File) param.thisObject;
-                            XposedBridge.log("NoDeviceCheck: File checked is " + file.toString() + " and result is " + param.getResult());
+                            XposedBridge.log("NoDeviceCheck: File checked (exists): " + file.toString() + " and result is " + param.getResult() + "Caller: " + lpparam.packageName);
+                        }
+                    });
+            XposedHelpers.findAndHookMethod(File.class, "canRead",
+                    new XC_MethodHook() {
+                        @Override
+                        protected void afterHookedMethod(MethodHookParam param)
+                                throws Throwable {
+                            File file = (File) param.thisObject;
+                            XposedBridge.log("NoDeviceCheck: File checked (canRead): " + file.toString() + " and result is " + param.getResult() + "Caller: " + lpparam.packageName);
+                        }
+                    });
+
+            XposedHelpers.findAndHookMethod(File.class, "canExecute",
+                    new XC_MethodHook() {
+                        @Override
+                        protected void afterHookedMethod(MethodHookParam param)
+                                throws Throwable {
+                            File file = (File) param.thisObject;
+                            XposedBridge.log("NoDeviceCheck: File checked (canExecute): " + file.toString() + " and result is " + param.getResult() + "Caller: " + lpparam.packageName);
                         }
                     });
         }
@@ -147,7 +166,7 @@ public class NoDeviceCheck implements IXposedHookLoadPackage {
                     protected void beforeHookedMethod(MethodHookParam param)
                             throws Throwable {
                         String name = (String) param.args[0];
-                        XposedBridge.log("NoDeviceCheck: Boolean checked is " + name.toString() + " and calling package is " + lpparam.packageName);
+                        XposedBridge.log("NoDeviceCheck: Boolean checked is " + name + " and calling package is " + lpparam.packageName);
                         // Modify server response to pass CTS check
                         if ("ctsProfileMatch".equals(name)
                                 || "isValidSignature".equals(name)) {
@@ -163,7 +182,7 @@ public class NoDeviceCheck implements IXposedHookLoadPackage {
                     protected void beforeHookedMethod(MethodHookParam param)
                             throws Throwable {
                         String name = (String) param.args[0];
-                        XposedBridge.log("NoDeviceCheck: String checked is " + name.toString() + " and calling package is " + lpparam.packageName);
+                        XposedBridge.log("NoDeviceCheck: String checked is " + name + " and calling package is " + lpparam.packageName);
                         // Modify server response to pass CTS check
                         if ("ctsProfileMatch".equals(name)
                                 || "isValidSignature".equals(name)) {
