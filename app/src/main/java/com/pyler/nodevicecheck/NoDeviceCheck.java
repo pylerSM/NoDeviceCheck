@@ -1,6 +1,7 @@
 package com.pyler.nodevicecheck;
 
 import android.content.Context;
+import android.util.Log;
 
 import org.json.JSONObject;
 
@@ -14,7 +15,43 @@ import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
 
 public class NoDeviceCheck implements IXposedHookLoadPackage {
-    public static final String CLASS_DROIDGUARD = "com.google.ccc.abulse.droidguard.DroidGuard";
+    public String[] keyWords = {"/su", "XposedBridge", "xposed", "xposed.installer", "app_process32_", "app_process64_", "supolicy", "sukernel", "libsupol.so", "SuperSUDaemon", "daemonsu", "Superuser", "chatter.pie", "libxposed"};
+    public static final String CLASS_DROIDGUARD = "com.google.ccc.abuse.droidguard.DroidGuard";
+
+
+    public boolean checkFileBool(File file, String packagename, String checktype) {
+        for (int i = 0; i < keyWords.length; i++) {
+            if (file.toString().contains(keyWords[i])) {
+                if ((!file.toString().contains("sum")) && (!file.toString().contains("sub")) && (!file.toString().contains("surface"))) {
+                    Log.d("NoDeviceCheck", "Found matching string - " + file + ". Caller: " + packagename + ". Checktype: " + checktype);
+                    XposedBridge.log("NoDeviceCheck: Found matching string - " + file + ". Caller: " + packagename + ". Checktype: " + checktype);
+                    return true;
+                }
+            }
+        }
+        return false;
+
+    }
+
+
+
+
+    public boolean checkFileStringArray(File[] file, String packagename, String checktype) {
+        for (File files : file)
+            for (int i = 0; i < keyWords.length; i++) {
+                if (file.toString().contains(keyWords[i])) {
+                    Log.d("NoDeviceCheck", "Found matching string - " + file + ". Caller: " + packagename + ". Checktype: " + checktype);
+                    return true;
+                }
+            }
+        return false;
+
+    }
+
+    public static void logHookAfter(XC_MethodHook.MethodHookParam param, File file) {
+        Log.d("NoDeviceCheck", "Method hook executed (" + param.method.getName() + ") for file " + file + ", post-result=" + param.getResult());
+    }
+
     @Override
     public void handleLoadPackage(final LoadPackageParam lpparam) throws Throwable {
         XposedBridge.log("NoDeviceCheck: We got droidguard apk");
@@ -105,9 +142,15 @@ public class NoDeviceCheck implements IXposedHookLoadPackage {
                         }
                     });
         }
-        if (("android".equals(lpparam.packageName)) || (lpparam.packageName.equals("com.google.ccc.abuse.droidguard")) || (lpparam.packageName.equals("com.google.android.gms")) || (lpparam.packageName.equals("com.google.android.apps.walletnfcrel")))  {
+
+        if (("android".equals(lpparam.packageName)) || ("droidguard".contains(lpparam.packageName)) || ("google.android.gms".contains(lpparam.packageName)) || ("walletnfcrel".contains(lpparam.packageName))) {
+
+//            Begin various boolean checks on file class
+
             XposedHelpers.findAndHookMethod(File.class, "exists",
                     new XC_MethodHook() {
+
+
                         @Override
                         protected void beforeHookedMethod(MethodHookParam param)
                                 throws Throwable {
@@ -116,48 +159,208 @@ public class NoDeviceCheck implements IXposedHookLoadPackage {
                             // Disable check for enforced SELinux state
                             if (new File("/sys/fs/selinux/enforce").equals(file)) {
                                 param.setResult(true);
+                                logHookAfter(param, file);
                                 return;
                             }
 
-                            // Disable check for SU binary files
-                            if (new File("/system/bin/su").equals(file) || new File("/system/xbin/su").equals(file)) {
+                            if (checkFileBool(file, lpparam.packageName, "exists")) {
                                 param.setResult(false);
-                                return;
+                                logHookAfter(param, file);
+
+
                             }
-                            if (new File("/system/framework/XposedBridge.jar").equals(file)) {
-                                param.setResult(false);
-                                return;
-                            }
-
-
                         }
 
-                        @Override
-                    protected void afterHookedMethod(MethodHookParam param)
-                            throws Throwable {
-                            File file = (File) param.thisObject;
-                            XposedBridge.log("NoDeviceCheck: File checked (exists): " + file.toString() + " and result is " + param.getResult() + "Caller: " + lpparam.packageName);
-                        }
-                    });
-            XposedHelpers.findAndHookMethod(File.class, "canRead",
-                    new XC_MethodHook() {
-                        @Override
-                        protected void afterHookedMethod(MethodHookParam param)
-                                throws Throwable {
-                            File file = (File) param.thisObject;
-                            XposedBridge.log("NoDeviceCheck: File checked (canRead): " + file.toString() + " and result is " + param.getResult() + "Caller: " + lpparam.packageName);
-                        }
+
+
+
                     });
 
             XposedHelpers.findAndHookMethod(File.class, "canExecute",
                     new XC_MethodHook() {
                         @Override
-                        protected void afterHookedMethod(MethodHookParam param)
+                        protected void beforeHookedMethod(MethodHookParam param)
                                 throws Throwable {
                             File file = (File) param.thisObject;
-                            XposedBridge.log("NoDeviceCheck: File checked (canExecute): " + file.toString() + " and result is " + param.getResult() + "Caller: " + lpparam.packageName);
+                            if (checkFileBool(file, lpparam.packageName, "canExecute")) {
+                                param.setResult(false);
+                                logHookAfter(param, file);
+
+                            }
+                        }
+
+
+                    });
+
+            XposedHelpers.findAndHookMethod(File.class, "canRead",
+                    new XC_MethodHook() {
+                        @Override
+                        protected void beforeHookedMethod(MethodHookParam param)
+                                throws Throwable {
+                            File file = (File) param.thisObject;
+                            if (checkFileBool(file, lpparam.packageName, "canRead")) {
+                                param.setResult(false);
+                                logHookAfter(param, file);
+
+                            }
                         }
                     });
+
+            XposedHelpers.findAndHookMethod(File.class, "canWrite",
+                    new XC_MethodHook() {
+                        @Override
+                        protected void beforeHookedMethod(MethodHookParam param)
+                                throws Throwable {
+                            File file = (File) param.thisObject;
+                            if (checkFileBool(file, lpparam.packageName, "canWrite")) {
+                                param.setResult(false);
+                                logHookAfter(param, file);
+
+                            }
+                        }
+                    });
+
+            XposedHelpers.findAndHookMethod(File.class, "createNewFile",
+                    new XC_MethodHook() {
+                        @Override
+                        protected void beforeHookedMethod(MethodHookParam param)
+                                throws Throwable {
+                            File file = (File) param.thisObject;
+                            if (checkFileBool(file, lpparam.packageName, "createNewFile")) {
+                                param.setResult(false);
+                                logHookAfter(param, file);
+
+                            }
+                        }
+                    });
+
+            XposedHelpers.findAndHookMethod(File.class, "isDirectory",
+                    new XC_MethodHook() {
+                        @Override
+                        protected void beforeHookedMethod(MethodHookParam param)
+                                throws Throwable {
+                            File file = (File) param.thisObject;
+                            if (checkFileBool(file, lpparam.packageName, "isDirectory")) {
+                                param.setResult(false);
+                                logHookAfter(param, file);
+
+                            }
+                        }
+                    });
+
+            XposedHelpers.findAndHookMethod(File.class, "isFile",
+                    new XC_MethodHook() {
+                        @Override
+                        protected void beforeHookedMethod(MethodHookParam param)
+                                throws Throwable {
+                            File file = (File) param.thisObject;
+                            if (checkFileBool(file, lpparam.packageName, "isFile")) {
+                                param.setResult(false);
+                                logHookAfter(param, file);
+
+                            }
+                        }
+                    });
+
+// #################################### End Boolean Check
+
+// #################################### Begin String Checks
+
+
+            XposedHelpers.findAndHookMethod(File.class, "getAbsolutePath",
+                    new XC_MethodHook() {
+                        @Override
+                        protected void beforeHookedMethod(MethodHookParam param)
+                                throws Throwable {
+                            File file = (File) param.thisObject;
+                            if (checkFileBool(file, lpparam.packageName, "getAbsolutePath")) {
+                                param.setResult("");
+                                logHookAfter(param, file);
+
+                            }
+                        }
+                    });
+
+
+            XposedHelpers.findAndHookMethod(File.class, "getName",
+                    new XC_MethodHook() {
+                        @Override
+                        protected void beforeHookedMethod(MethodHookParam param)
+                                throws Throwable {
+                            File file = (File) param.thisObject;
+                            if (checkFileBool(file, lpparam.packageName, "getName")) {
+                                param.setResult("");
+                                logHookAfter(param, file);
+                            }
+                        }
+                    });
+
+            XposedHelpers.findAndHookMethod(File.class, "getParent",
+                    new XC_MethodHook() {
+                        @Override
+                        protected void beforeHookedMethod(MethodHookParam param)
+                                throws Throwable {
+                            File file = (File) param.thisObject;
+                            if (checkFileBool(file, lpparam.packageName, "getParent")) {
+                                param.setResult("");
+                                logHookAfter(param, file);
+
+                            }
+                        }
+                    });
+
+            XposedHelpers.findAndHookMethod(File.class, "getPath",
+                    new XC_MethodHook() {
+                        @Override
+                        protected void beforeHookedMethod(MethodHookParam param)
+                                throws Throwable {
+                            File file = (File) param.thisObject;
+                            if (checkFileBool(file, lpparam.packageName, "getPath")) {
+                                param.setResult("");
+                                logHookAfter(param, file);
+
+                            }
+                        }
+                    });
+
+
+            XposedHelpers.findAndHookMethod(File.class, "listFiles",
+                    new XC_MethodHook() {
+                        @Override
+                        protected void beforeHookedMethod(MethodHookParam param)
+                                throws Throwable {
+                            File file = (File) param.thisObject;
+                            Log.v("NoDeviceCheck:", "File checked (listFiles): " + file.toString() + " and result is " + param.getResult() + " Caller: " + lpparam.packageName);
+
+
+                        }
+                    });
+
+            XposedHelpers.findAndHookMethod(File.class, "list",
+                    new XC_MethodHook() {
+                        @Override
+                        protected void beforeHookedMethod(MethodHookParam param)
+                                throws Throwable {
+                            File file = (File) param.thisObject;
+                            Log.v("NoDeviceCheck:", "File checked (list): " + file.toString() + " and result is " + param.getResult() + " Caller: " + lpparam.packageName);
+
+
+                        }
+                    });
+
+            XposedHelpers.findAndHookMethod(File.class, "listRoots",
+                    new XC_MethodHook() {
+                        @Override
+                        protected void beforeHookedMethod(MethodHookParam param)
+                                throws Throwable {
+                            File file = (File) param.thisObject;
+                            Log.v("NoDeviceCheck:", "File checked (listRoots): " + file.toString() + " and result is " + param.getResult() + " Caller: " + lpparam.packageName);
+
+
+                        }
+                    });
+
+
         }
 
         XposedHelpers.findAndHookMethod(JSONObject.class, "getBoolean",
@@ -166,11 +369,11 @@ public class NoDeviceCheck implements IXposedHookLoadPackage {
                     protected void beforeHookedMethod(MethodHookParam param)
                             throws Throwable {
                         String name = (String) param.args[0];
-                        XposedBridge.log("NoDeviceCheck: Boolean checked is " + name + " and calling package is " + lpparam.packageName);
                         // Modify server response to pass CTS check
                         if ("ctsProfileMatch".equals(name)
                                 || "isValidSignature".equals(name)) {
                             param.setResult(true);
+
                             return;
                         }
                     }
